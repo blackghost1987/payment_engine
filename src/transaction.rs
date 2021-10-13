@@ -1,8 +1,22 @@
 use rust_decimal::Decimal;
-use serde::{Serialize, Deserialize};
+use serde::Deserialize;
 
 pub type ClientId = u16;
 pub type TransactionId = u32;
+
+#[derive(Debug, PartialEq)]
+pub enum Error {
+    MissingAmount,
+    InsufficientFunds,
+    ClientIdMismatch,
+    AccountLocked,
+    UnknownTransactionId,
+    DuplicatedTransactionId,
+    AlreadyDisputed,
+    NotDisputed,
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -23,13 +37,20 @@ pub struct Transaction {
     #[serde(rename = "tx")]
     pub transaction_id: TransactionId,
     pub amount: Option<Decimal>,
+    #[serde(skip)]
+    pub disputed: bool,
+    #[serde(skip)]
+    pub chargeback: bool,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
-pub struct Account {
-    client_id: ClientId,
-    available: Decimal,
-    held: Decimal,
-    total: Decimal, // TODO make this a calculated value
-    locked: bool,
+impl Transaction {
+    pub fn get_amount(&self) -> Result<Decimal> {
+        self.amount.ok_or(Error::MissingAmount)
+    }
+
+    pub fn check_amount_empty(&self) {
+        if let Some(_) = self.amount {
+            eprintln!("Unexpected amount in transaction! ID: {}", self.transaction_id)
+        }
+    }
 }

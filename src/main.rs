@@ -1,5 +1,6 @@
-mod csv_parser;
+mod csv_handler;
 mod transaction;
+mod account;
 
 use clap::{App, Arg, ArgMatches};
 use std::fs::File;
@@ -26,12 +27,15 @@ fn parse_args() -> ArgMatches<'static> {
 }
 
 fn process_file(mut file: File, verbose: bool) {
-    let tr_result = csv_parser::read_transactions(&mut file, verbose);
+    let tr_result = csv_handler::read_transactions(&mut file, verbose);
     match tr_result {
-        Ok(trs) => {
+        Ok(transactions) => {
             if verbose {
-                println!("{} transactions loaded", trs.len());
+                println!("{} transactions loaded", transactions.len());
             }
+            let accounts = account::process_all(transactions);
+            println!("{:#?}", accounts);
+            // TODO csv output
         }
         Err(e) => eprintln!("Error while loading transactions: {:?}", e),
     }

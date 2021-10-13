@@ -11,7 +11,7 @@ pub fn read_transactions(input: &mut dyn io::Read, verbose: bool) -> Result<Vec<
     for row in reader.deserialize() {
         let tr: Transaction = row?;
         if verbose {
-            println!("{:?}", tr);
+            println!("{}: {:?}", tr.transaction_id, tr);
         }
         res.push(tr);
     }
@@ -36,6 +36,8 @@ mod tests {
                 client_id: 1,
                 transaction_id: 5,
                 amount: Some(Decimal::new(987654321, 4)),
+                disputed: false,
+                chargeback: false
             }];
 
             assert_eq!(transactions, expected)
