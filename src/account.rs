@@ -81,7 +81,7 @@ impl Account {
         self.transaction_status.get_mut(&tr_id).ok_or(Error::UnknownTransactionId)
     }
 
-    pub fn process(&mut self, tr: &Transaction) -> Result<()> {
+    pub fn process(&mut self, tr: &Transaction, verbose: bool) -> Result<()> {
         use TransactionType::*;
 
         if self.client_id != tr.client_id {
@@ -117,7 +117,7 @@ impl Account {
                 self.available -= amount;
             }
             Dispute => {
-                tr.check_amount_empty();
+                tr.check_amount_empty(verbose);
                 let amount = {
                     let ref_tr = self.get_transaction_status(tr.transaction_id)?;
                     ref_tr.dispute()?
@@ -126,7 +126,7 @@ impl Account {
                 self.held += amount;
             },
             Resolve => {
-                tr.check_amount_empty();
+                tr.check_amount_empty(verbose);
                 let amount = {
                     let ref_tr = self.get_transaction_status(tr.transaction_id)?;
                     ref_tr.resolve()?
@@ -135,7 +135,7 @@ impl Account {
                 self.held -= amount;
             },
             Chargeback => {
-                tr.check_amount_empty();
+                tr.check_amount_empty(verbose);
                 let amount = {
                     let ref_tr = self.get_transaction_status(tr.transaction_id)?;
                     ref_tr.chargeback()?
@@ -155,9 +155,9 @@ pub fn process_all(transactions: Vec<Transaction>, verbose: bool) -> HashMap<Cli
         // get or create if not yet exists
         let acc = accounts.entry(tr.client_id).or_insert(Account::new(tr.client_id));
         // process transaction
-        if let Err(e) = acc.process(&tr) {
+        if let Err(e) = acc.process(&tr, verbose) {
             if verbose {
-                eprintln!("Ignoring row #{} (transaction_id: {}). Reason: {:?}", i, tr.transaction_id, e)
+                println!("Ignoring row #{} (transaction_id: {}). Reason: {:?}", i, tr.transaction_id, e)
             }
         }
     }
@@ -205,7 +205,7 @@ mod tests {
             client_id: 5,
             transaction_id: 1,
             amount: Some(Decimal::new(123456, 2)),
-        });
+        }, false);
         assert!(res.is_err(), "foreign transaction should fail");
         assert_eq!(acc.total(), Decimal::ZERO);
         assert_eq!(acc.locked, false);
@@ -219,7 +219,7 @@ mod tests {
             client_id: 5,
             transaction_id: 1,
             amount: Some(Decimal::new(123456, 2)),
-        });
+        }, false);
         assert!(res.is_ok(), "processing error: {:?}", res);
 
         assert_eq!(acc.held, Decimal::ZERO);
@@ -236,7 +236,7 @@ mod tests {
             client_id: 5,
             transaction_id: 1,
             amount: Some(Decimal::new(123456, 2)),
-        });
+        }, false);
         assert!(res.is_ok(), "processing error: {:?}", res);
 
         let res = acc.process(&Transaction {
@@ -244,7 +244,7 @@ mod tests {
             client_id: 5,
             transaction_id: 1,
             amount: Some(Decimal::new(3456, 2)),
-        });
+        }, false);
         assert!(res.is_err(), "duplicated id should fail");
         assert_eq!(acc.total(), Decimal::new(123456, 2));
         assert_eq!(acc.locked, false);
@@ -258,14 +258,14 @@ mod tests {
             client_id: 5,
             transaction_id: 1,
             amount: Some(Decimal::new(123456, 2)),
-        });
+        }, false);
         assert!(res.is_ok(), "deposit error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Withdrawal,
             client_id: 5,
             transaction_id: 2,
             amount: Some(Decimal::new(3456, 2)),
-        });
+        }, false);
         assert!(res.is_ok(), "withdraw error: {:?}", res);
 
         assert_eq!(acc.held, Decimal::ZERO);
@@ -282,14 +282,14 @@ mod tests {
             client_id: 5,
             transaction_id: 1,
             amount: Some(Decimal::new(123456, 2)),
-        });
+        }, false);
         assert!(res.is_ok(), "deposit error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Withdrawal,
             client_id: 5,
             transaction_id: 2,
             amount: Some(Decimal::new(11113456, 2)),
-        });
+        }, false);
         assert!(res.is_err(), "too large withdrawal should fail");
         assert_eq!(acc.total(), Decimal::new(123456, 2));
         assert_eq!(acc.locked, false);
@@ -303,14 +303,14 @@ mod tests {
             client_id: 5,
             transaction_id: 1,
             amount: Some(Decimal::new(123456, 2)),
-        });
+        }, false);
         assert!(res.is_ok(), "deposit error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Dispute,
             client_id: 5,
             transaction_id: 1,
             amount: None,
-        });
+        }, false);
         assert!(res.is_ok(), "dispute error: {:?}", res);
 
         assert_eq!(acc.held, Decimal::new(123456, 2));
@@ -327,21 +327,21 @@ mod tests {
             client_id: 5,
             transaction_id: 1,
             amount: Some(Decimal::new(123456, 2)),
-        });
+        }, false);
         assert!(res.is_ok(), "deposit error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Dispute,
             client_id: 5,
             transaction_id: 1,
             amount: None,
-        });
+        }, false);
         assert!(res.is_ok(), "dispute error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Dispute,
             client_id: 5,
             transaction_id: 1,
             amount: None,
-        });
+        }, false);
         assert!(res.is_err(), "double dispute should fail");
 
         assert_eq!(acc.held, Decimal::new(123456, 2));
@@ -358,21 +358,21 @@ mod tests {
             client_id: 5,
             transaction_id: 1,
             amount: Some(Decimal::new(123456, 2)),
-        });
+        }, false);
         assert!(res.is_ok(), "deposit error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Dispute,
             client_id: 5,
             transaction_id: 1,
             amount: None,
-        });
+        }, false);
         assert!(res.is_ok(), "dispute error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Resolve,
             client_id: 5,
             transaction_id: 1,
             amount: None,
-        });
+        }, false);
         assert!(res.is_ok(), "resolve error: {:?}", res);
 
         assert_eq!(acc.held, Decimal::ZERO);
@@ -389,28 +389,28 @@ mod tests {
             client_id: 5,
             transaction_id: 1,
             amount: Some(Decimal::new(123456, 2)),
-        });
+        }, false);
         assert!(res.is_ok(), "deposit error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Dispute,
             client_id: 5,
             transaction_id: 1,
             amount: None,
-        });
+        }, false);
         assert!(res.is_ok(), "dispute error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Resolve,
             client_id: 5,
             transaction_id: 1,
             amount: None,
-        });
+        }, false);
         assert!(res.is_ok(), "resolve error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Dispute,
             client_id: 5,
             transaction_id: 1,
             amount: None,
-        });
+        }, false);
         assert!(res.is_ok(), "second dispute error: {:?}", res);
 
         assert_eq!(acc.held, Decimal::new(123456, 2));
@@ -427,21 +427,21 @@ mod tests {
             client_id: 5,
             transaction_id: 1,
             amount: Some(Decimal::new(123456, 2)),
-        });
+        }, false);
         assert!(res.is_ok(), "deposit error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Dispute,
             client_id: 5,
             transaction_id: 1,
             amount: None,
-        });
+        }, false);
         assert!(res.is_ok(), "dispute error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Chargeback,
             client_id: 5,
             transaction_id: 1,
             amount: None,
-        });
+        }, false);
         assert!(res.is_ok(), "chargeback error: {:?}", res);
 
         assert_eq!(acc.held, Decimal::ZERO);
@@ -458,14 +458,14 @@ mod tests {
             client_id: 5,
             transaction_id: 1,
             amount: Some(Decimal::new(123456, 2)),
-        });
+        }, false);
         assert!(res.is_ok(), "deposit error: {:?}", res);
         let res = acc.process(&Transaction {
             transaction_type: TransactionType::Withdrawal,
             client_id: 5,
             transaction_id: 2,
             amount: Some(Decimal::new(1111, 2)),
-        });
+        }, false);
         assert!(res.is_ok(), "withdrawal error: {:?}", res);
         assert_eq!(acc.available, Decimal::new(122345, 2));
         assert_eq!(acc.total(), Decimal::new(122345, 2));
@@ -474,7 +474,7 @@ mod tests {
             client_id: 5,
             transaction_id: 2,
             amount: None,
-        });
+        }, false);
         assert!(res.is_ok(), "dispute error: {:?}", res);
         assert_eq!(acc.available, Decimal::new(123456, 2));
         assert_eq!(acc.held, Decimal::new(-1111, 2));
@@ -484,7 +484,7 @@ mod tests {
             client_id: 5,
             transaction_id: 2,
             amount: None,
-        });
+        }, false);
         assert!(res.is_ok(), "chargeback error: {:?}", res);
 
         assert_eq!(acc.held, Decimal::ZERO);

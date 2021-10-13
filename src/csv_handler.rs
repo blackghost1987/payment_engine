@@ -23,7 +23,6 @@ pub fn read_transactions(input: &mut dyn io::Read, verbose: bool) -> Result<Vec<
 pub fn write_accounts(accounts: HashMap<ClientId, Account>, output: &mut dyn io::Write) -> Result<()> {
     let acc_list: Vec<&Account> = accounts.values().collect();
     let out_list: Vec<AccountOutput> = acc_list.iter().map(|a| (*a).into()).collect();
-    //println!("{:?}", out_list);
 
     let mut writer = csv::Writer::from_writer(output);
     for out in out_list {

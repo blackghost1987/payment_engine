@@ -44,9 +44,11 @@ impl Transaction {
         self.amount.ok_or(Error::MissingAmount)
     }
 
-    pub fn check_amount_empty(&self) {
+    pub fn check_amount_empty(&self, verbose: bool) {
         if let Some(_) = self.amount {
-            eprintln!("Unexpected amount in transaction! ID: {}", self.transaction_id)
+            if verbose {
+                println!("Unexpected amount in transaction! ID: {}", self.transaction_id)
+            }
         }
     }
 }

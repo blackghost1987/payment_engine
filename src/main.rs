@@ -42,9 +42,13 @@ fn process_file(mut file: File, verbose: bool) {
             let write_res = csv_handler::write_accounts(accounts, &mut io::stdout());
             if let Err(e) = write_res {
                 eprintln!("Error while writing output: {:?}", e);
+                process::exit(4)
             }
         }
-        Err(e) => eprintln!("Error while loading transactions: {:?}", e),
+        Err(e) => {
+            eprintln!("Error while loading transactions: {:?}", e);
+            process::exit(3)
+        },
     }
 }
 
