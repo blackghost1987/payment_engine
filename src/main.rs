@@ -33,9 +33,13 @@ fn process_file(mut file: File, verbose: bool) {
             if verbose {
                 println!("{} transactions loaded", transactions.len());
             }
+
             let accounts = account::process_all(transactions);
-            println!("{:#?}", accounts);
-            // TODO csv output
+            if verbose {
+                println!("{:#?}", accounts);
+            }
+
+            csv_handler::write_accounts(accounts);
         }
         Err(e) => eprintln!("Error while loading transactions: {:?}", e),
     }

@@ -1,7 +1,9 @@
 use csv::*;
 use std::io;
 
-use crate::transaction::Transaction;
+use crate::transaction::{Transaction, ClientId};
+use crate::account::Account;
+use std::collections::HashMap;
 
 pub fn read_transactions(input: &mut dyn io::Read, verbose: bool) -> Result<Vec<Transaction>> {
     let mut reader = ReaderBuilder::new().trim(Trim::All).from_reader(input);
@@ -16,6 +18,11 @@ pub fn read_transactions(input: &mut dyn io::Read, verbose: bool) -> Result<Vec<
         res.push(tr);
     }
     Ok(res)
+}
+
+pub fn write_accounts(accounts: HashMap<ClientId, Account>) {
+    let _acc_list: Vec<&Account> = accounts.values().collect();
+    // TODO implement CSV output
 }
 
 #[cfg(test)]
