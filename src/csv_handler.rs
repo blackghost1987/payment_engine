@@ -24,6 +24,8 @@ pub fn write_accounts(accounts: HashMap<ClientId, Account>, output: &mut dyn io:
     let acc_list: Vec<&Account> = accounts.values().collect();
     let out_list: Vec<AccountOutput> = acc_list.iter().map(|a| (*a).into()).collect();
 
+    // TODO output max 4 decimals
+
     let mut writer = csv::Writer::from_writer(output);
     for out in out_list {
         writer.serialize(out)?;

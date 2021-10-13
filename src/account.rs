@@ -7,22 +7,22 @@ use std::ops::Neg;
 
 #[derive(Debug, PartialEq)]
 pub struct TransactionStatus {
-    pub amount: Decimal,
+    pub amount_change: Decimal,
     pub disputed: bool,
     pub chargeback: bool,
 }
 
 impl TransactionStatus {
     pub fn new(transaction: &Transaction) -> Result<TransactionStatus> {
-        let mut amount = transaction.get_amount()?;
+        let mut amount_change = transaction.get_amount()?;
 
         // negate Amount so a disputed Withdrawal increases the available amount
         if transaction.transaction_type == TransactionType::Withdrawal {
-            amount = amount.neg();
+            amount_change = amount_change.neg();
         }
 
         Ok(TransactionStatus {
-            amount,
+            amount_change,
             disputed: false,
             chargeback: false,
         })
@@ -33,7 +33,7 @@ impl TransactionStatus {
             return Err(Error::AlreadyDisputed);
         }
         self.disputed = true;
-        Ok(self.amount)
+        Ok(self.amount_change)
     }
 
     pub fn resolve(&mut self) -> Result<Decimal> {
@@ -41,7 +41,7 @@ impl TransactionStatus {
             return Err(Error::NotDisputed);
         }
         self.disputed = false;
-        Ok(self.amount)
+        Ok(self.amount_change)
     }
 
     pub fn chargeback(&mut self) -> Result<Decimal> {
@@ -49,7 +49,7 @@ impl TransactionStatus {
             return Err(Error::NotDisputed);
         }
         self.chargeback = true;
-        Ok(self.amount)
+        Ok(self.amount_change)
     }
 }
 
@@ -98,49 +98,47 @@ impl Account {
                     return Err(Error::DuplicatedTransactionId);
                 }
                 let status = TransactionStatus::new(tr)?;
-                self.transaction_status.insert(tr.transaction_id, status);
 
-                let amount = tr.get_amount()?;
-                self.available += amount;
+                self.available += status.amount_change;
+                self.transaction_status.insert(tr.transaction_id, status);
             }
             Withdrawal => {
                 if self.transaction_status.contains_key(&tr.transaction_id) {
                     return Err(Error::DuplicatedTransactionId);
                 }
                 let status = TransactionStatus::new(tr)?;
-                self.transaction_status.insert(tr.transaction_id, status);
-
-                let amount = tr.get_amount()?;
-                if self.available < amount {
+                if (self.available + status.amount_change).is_sign_negative() {
                     return Err(Error::InsufficientFunds);
                 }
-                self.available -= amount;
+
+                self.available += status.amount_change;
+                self.transaction_status.insert(tr.transaction_id, status);
             }
             Dispute => {
                 tr.check_amount_empty(verbose);
-                let amount = {
+                let amount_change = {
                     let ref_tr = self.get_transaction_status(tr.transaction_id)?;
                     ref_tr.dispute()?
                 };
-                self.available -= amount;
-                self.held += amount;
+                self.available -= amount_change;
+                self.held += amount_change;
             },
             Resolve => {
                 tr.check_amount_empty(verbose);
-                let amount = {
+                let amount_change = {
                     let ref_tr = self.get_transaction_status(tr.transaction_id)?;
                     ref_tr.resolve()?
                 };
-                self.available += amount;
-                self.held -= amount;
+                self.available += amount_change;
+                self.held -= amount_change;
             },
             Chargeback => {
                 tr.check_amount_empty(verbose);
-                let amount = {
+                let amount_change = {
                     let ref_tr = self.get_transaction_status(tr.transaction_id)?;
                     ref_tr.chargeback()?
                 };
-                self.held -= amount;
+                self.held -= amount_change;
                 self.locked = true;
             },
         }
@@ -206,7 +204,7 @@ mod tests {
             transaction_id: 1,
             amount: Some(Decimal::new(123456, 2)),
         }, false);
-        assert!(res.is_err(), "foreign transaction should fail");
+        assert_eq!(res, Err(Error::ClientIdMismatch), "foreign transaction should fail");
         assert_eq!(acc.total(), Decimal::ZERO);
         assert_eq!(acc.locked, false);
     }
@@ -245,7 +243,7 @@ mod tests {
             transaction_id: 1,
             amount: Some(Decimal::new(3456, 2)),
         }, false);
-        assert!(res.is_err(), "duplicated id should fail");
+        assert_eq!(res, Err(Error::DuplicatedTransactionId), "duplicated id should fail");
         assert_eq!(acc.total(), Decimal::new(123456, 2));
         assert_eq!(acc.locked, false);
     }
@@ -290,7 +288,7 @@ mod tests {
             transaction_id: 2,
             amount: Some(Decimal::new(11113456, 2)),
         }, false);
-        assert!(res.is_err(), "too large withdrawal should fail");
+        assert_eq!(res, Err(Error::InsufficientFunds), "too large withdrawal should fail");
         assert_eq!(acc.total(), Decimal::new(123456, 2));
         assert_eq!(acc.locked, false);
     }
@@ -342,7 +340,7 @@ mod tests {
             transaction_id: 1,
             amount: None,
         }, false);
-        assert!(res.is_err(), "double dispute should fail");
+        assert_eq!(res, Err(Error::AlreadyDisputed), "double dispute should fail");
 
         assert_eq!(acc.held, Decimal::new(123456, 2));
         assert_eq!(acc.available, Decimal::ZERO);
@@ -491,5 +489,38 @@ mod tests {
         assert_eq!(acc.available, Decimal::new(123456, 2));
         assert_eq!(acc.total(), Decimal::new(123456, 2));
         assert_eq!(acc.locked, true);
+    }
+
+    #[test]
+    fn test_failed_withdrawal_dispute() {
+        let mut acc = Account::new(5);
+        let res = acc.process(&Transaction {
+            transaction_type: TransactionType::Deposit,
+            client_id: 5,
+            transaction_id: 1,
+            amount: Some(Decimal::new(123456, 2)),
+        }, false);
+        assert!(res.is_ok(), "deposit error: {:?}", res);
+        let res = acc.process(&Transaction {
+            transaction_type: TransactionType::Withdrawal,
+            client_id: 5,
+            transaction_id: 2,
+            amount: Some(Decimal::new(999991111, 2)),
+        }, false);
+        assert_eq!(res, Err(Error::InsufficientFunds), "too large withdrawal should fail");
+        assert_eq!(acc.available, Decimal::new(123456, 2));
+        assert_eq!(acc.total(), Decimal::new(123456, 2));
+        let res = acc.process(&Transaction {
+            transaction_type: TransactionType::Dispute,
+            client_id: 5,
+            transaction_id: 2,
+            amount: None,
+        }, false);
+        assert_eq!(res, Err(Error::UnknownTransactionId), "failed withdrawal should not be available for dispute");
+
+        assert_eq!(acc.held, Decimal::ZERO);
+        assert_eq!(acc.available, Decimal::new(123456, 2));
+        assert_eq!(acc.total(), Decimal::new(123456, 2));
+        assert_eq!(acc.locked, false);
     }
 }
