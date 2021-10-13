@@ -1,19 +1,18 @@
 use csv::*;
-use rust_decimal::Decimal;
 use std::io;
 
 use crate::transaction::Transaction;
 
 pub fn read_transactions(input: &mut dyn io::Read, verbose: bool) -> Result<Vec<Transaction>> {
-    let mut reader = ReaderBuilder::new()
-        .trim(Trim::All)
-        .from_reader(input);
+    let mut reader = ReaderBuilder::new().trim(Trim::All).from_reader(input);
 
     let mut res = Vec::with_capacity(100);
 
     for row in reader.deserialize() {
         let tr: Transaction = row?;
-        if verbose { println!("{:?}", tr); }
+        if verbose {
+            println!("{:?}", tr);
+        }
         res.push(tr);
     }
     Ok(res)
@@ -35,7 +34,7 @@ mod tests {
                 transaction_type: TransactionType::Deposit,
                 client_id: 1,
                 transaction_id: 5,
-                amount: Decimal::new(987654321, 4)
+                amount: Decimal::new(987654321, 4),
             }];
 
             assert_eq!(transactions, expected)
