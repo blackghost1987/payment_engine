@@ -21,6 +21,7 @@ pub fn read_transactions(input: &mut dyn io::Read, verbose: bool) -> Result<Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal::Decimal;
     use crate::transaction::{Transaction, TransactionType};
 
     #[test]
@@ -34,7 +35,7 @@ mod tests {
                 transaction_type: TransactionType::Deposit,
                 client_id: 1,
                 transaction_id: 5,
-                amount: Decimal::new(987654321, 4),
+                amount: Some(Decimal::new(987654321, 4)),
             }];
 
             assert_eq!(transactions, expected)

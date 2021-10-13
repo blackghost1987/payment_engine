@@ -1,5 +1,5 @@
 use rust_decimal::Decimal;
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 
 pub type ClientId = u16;
 pub type TransactionId = u32;
@@ -22,5 +22,14 @@ pub struct Transaction {
     pub client_id: ClientId,
     #[serde(rename = "tx")]
     pub transaction_id: TransactionId,
-    pub amount: Decimal,
+    pub amount: Option<Decimal>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct Account {
+    client_id: ClientId,
+    available: Decimal,
+    held: Decimal,
+    total: Decimal, // TODO make this a calculated value
+    locked: bool,
 }

@@ -17,10 +17,10 @@ fn parse_args() -> ArgMatches<'static> {
                 .required(true),
         )
         .arg(
-            Arg::with_name("silent")
-                .short("s")
-                .long("silent")
-                .help("Hide errors"),
+            Arg::with_name("verbose")
+                .short("v")
+                .long("verbose")
+                .help("Print data during processing"),
         )
         .get_matches()
 }
@@ -41,7 +41,7 @@ fn main() {
     let opts = parse_args();
 
     let filename = opts.value_of("INPUT").expect("missing input arg"); // cannot fail here because it's a required arg
-    let verbose = opts.is_present("silent");
+    let verbose = opts.is_present("verbose");
 
     match File::open(filename) {
         Ok(file) => process_file(file, verbose),
