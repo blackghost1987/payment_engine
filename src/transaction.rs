@@ -45,10 +45,11 @@ impl Transaction {
     }
 
     pub fn check_amount_empty(&self, verbose: bool) {
-        if let Some(_) = self.amount {
-            if verbose {
-                println!("Unexpected amount in transaction! ID: {}", self.transaction_id)
-            }
+        if verbose && self.amount.is_some() {
+            println!(
+                "Unexpected amount in transaction! ID: {}",
+                self.transaction_id
+            )
         }
     }
 }

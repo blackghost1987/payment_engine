@@ -1,10 +1,10 @@
+mod account;
 mod csv_handler;
 mod transaction;
-mod account;
 
 use clap::{App, Arg, ArgMatches};
 use std::fs::File;
-use std::{process, io};
+use std::{io, process};
 
 const APP_NAME: &str = "Payment Engine";
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -48,7 +48,7 @@ fn process_file(mut file: File, verbose: bool) {
         Err(e) => {
             eprintln!("Error while loading transactions: {:?}", e);
             process::exit(3)
-        },
+        }
     }
 }
 

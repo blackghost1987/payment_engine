@@ -1,8 +1,8 @@
 use csv::*;
 use std::io;
 
-use crate::transaction::{Transaction, ClientId};
 use crate::account::{Account, AccountOutput};
+use crate::transaction::{ClientId, Transaction};
 use std::collections::HashMap;
 
 pub fn read_transactions(input: &mut dyn io::Read, verbose: bool) -> Result<Vec<Transaction>> {
@@ -20,7 +20,10 @@ pub fn read_transactions(input: &mut dyn io::Read, verbose: bool) -> Result<Vec<
     Ok(res)
 }
 
-pub fn write_accounts(accounts: HashMap<ClientId, Account>, output: &mut dyn io::Write) -> Result<()> {
+pub fn write_accounts(
+    accounts: HashMap<ClientId, Account>,
+    output: &mut dyn io::Write,
+) -> Result<()> {
     let acc_list: Vec<&Account> = accounts.values().collect();
     let out_list: Vec<AccountOutput> = acc_list.iter().map(|a| (*a).into()).collect();
 
@@ -29,7 +32,7 @@ pub fn write_accounts(accounts: HashMap<ClientId, Account>, output: &mut dyn io:
     let mut writer = csv::Writer::from_writer(output);
     for out in out_list {
         writer.serialize(out)?;
-    };
+    }
     writer.flush()?;
     Ok(())
 }
@@ -37,8 +40,8 @@ pub fn write_accounts(accounts: HashMap<ClientId, Account>, output: &mut dyn io:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rust_decimal::Decimal;
     use crate::transaction::{Transaction, TransactionType};
+    use rust_decimal::Decimal;
 
     #[test]
     fn test_read() {
