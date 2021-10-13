@@ -23,21 +23,25 @@ fn parse_args() -> ArgMatches<'static> {
         .get_matches()
 }
 
-fn process_file(file: File, silent: bool) {
-    let transactions = csv_parser::load_file(file, silent);
-    println!("Transactions: {:?}", transactions);
+fn process_file(mut file: File, verbose: bool) {
+    let tr_result = csv_parser::read_transactions(&mut file, verbose);
+    match tr_result {
+        Ok(trs) => if verbose { println!("{} transactions loaded", trs.len()); },
+        Err(e) => eprintln!("Error while loading transactions: {:?}", e)
+    }
+
 }
 
 fn main() {
     let opts = parse_args();
 
     let filename = opts.value_of("INPUT").expect("missing input arg"); // cannot fail here because it's a required arg
-    let silent = opts.is_present("silent");
+    let verbose = opts.is_present("silent");
 
     match File::open(filename) {
-        Ok(file) => process_file(file, silent),
+        Ok(file) => process_file(file, verbose),
         Err(e) => {
-            if !silent { eprintln!("Opening of file failed! Error: {:?}", e); }
+            eprintln!("Opening of file failed! Error: {:?}", e);
             process::exit(2)
         }
     }
