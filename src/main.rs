@@ -1,3 +1,6 @@
+mod csv_parser;
+mod transaction;
+
 use clap::{App, Arg, ArgMatches};
 use std::fs::File;
 use std::process;
@@ -18,6 +21,11 @@ fn parse_args() -> ArgMatches<'static> {
             .help("Hide errors")
         )
         .get_matches()
+}
+
+fn process_file(file: File, silent: bool) {
+    let transactions = csv_parser::load_file(file, silent);
+    println!("Transactions: {:?}", transactions);
 }
 
 fn main() {
