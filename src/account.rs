@@ -1,4 +1,4 @@
-use rust_decimal::Decimal;
+use rust_decimal::{Decimal, RoundingStrategy};
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -175,9 +175,9 @@ impl<'a> From<&'a Account> for AccountOutput {
     fn from(a: &'a Account) -> Self {
         AccountOutput {
             client: a.client_id,
-            available: a.available,
-            held: a.held,
-            total: a.total(),
+            available: a.available.round_dp_with_strategy(4, RoundingStrategy::MidpointAwayFromZero),
+            held: a.held.round_dp_with_strategy(4, RoundingStrategy::MidpointAwayFromZero),
+            total: a.total().round_dp_with_strategy(4, RoundingStrategy::MidpointAwayFromZero),
             locked: a.locked,
         }
     }
