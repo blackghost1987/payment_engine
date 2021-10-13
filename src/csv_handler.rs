@@ -2,7 +2,7 @@ use csv::*;
 use std::io;
 
 use crate::transaction::{Transaction, ClientId};
-use crate::account::Account;
+use crate::account::{Account, AccountOutput};
 use std::collections::HashMap;
 
 pub fn read_transactions(input: &mut dyn io::Read, verbose: bool) -> Result<Vec<Transaction>> {
@@ -20,9 +20,17 @@ pub fn read_transactions(input: &mut dyn io::Read, verbose: bool) -> Result<Vec<
     Ok(res)
 }
 
-pub fn write_accounts(accounts: HashMap<ClientId, Account>) {
-    let _acc_list: Vec<&Account> = accounts.values().collect();
-    // TODO implement CSV output
+pub fn write_accounts(accounts: HashMap<ClientId, Account>, output: &mut dyn io::Write) -> Result<()> {
+    let acc_list: Vec<&Account> = accounts.values().collect();
+    let out_list: Vec<AccountOutput> = acc_list.iter().map(|a| (*a).into()).collect();
+    //println!("{:?}", out_list);
+
+    let mut writer = csv::Writer::from_writer(output);
+    for out in out_list {
+        writer.serialize(out)?;
+    };
+    writer.flush()?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -32,10 +40,10 @@ mod tests {
     use crate::transaction::{Transaction, TransactionType};
 
     #[test]
-    fn test_parse() {
+    fn test_read() {
         let input = "type, client, tx, amount\ndeposit, 1, 5, 98765.4321";
-        let res = read_transactions(&mut input.as_bytes(), true);
-        assert!(res.is_ok());
+        let res = read_transactions(&mut input.as_bytes(), false);
+        assert!(res.is_ok(), "csv parsing error: {:?}", res);
 
         if let Ok(transactions) = res {
             let expected = vec![Transaction {
@@ -43,8 +51,6 @@ mod tests {
                 client_id: 1,
                 transaction_id: 5,
                 amount: Some(Decimal::new(987654321, 4)),
-                disputed: false,
-                chargeback: false
             }];
 
             assert_eq!(transactions, expected)

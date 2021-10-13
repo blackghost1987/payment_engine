@@ -37,10 +37,6 @@ pub struct Transaction {
     #[serde(rename = "tx")]
     pub transaction_id: TransactionId,
     pub amount: Option<Decimal>,
-    #[serde(skip)]
-    pub disputed: bool,
-    #[serde(skip)]
-    pub chargeback: bool,
 }
 
 impl Transaction {

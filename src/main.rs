@@ -4,7 +4,7 @@ mod account;
 
 use clap::{App, Arg, ArgMatches};
 use std::fs::File;
-use std::process;
+use std::{process, io};
 
 const APP_NAME: &str = "Payment Engine";
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -21,7 +21,7 @@ fn parse_args() -> ArgMatches<'static> {
             Arg::with_name("verbose")
                 .short("v")
                 .long("verbose")
-                .help("Print data during processing"),
+                .help("Print progress data"),
         )
         .get_matches()
 }
@@ -31,15 +31,18 @@ fn process_file(mut file: File, verbose: bool) {
     match tr_result {
         Ok(transactions) => {
             if verbose {
-                println!("{} transactions loaded", transactions.len());
+                println!("Transactions loaded: {}", transactions.len());
             }
 
-            let accounts = account::process_all(transactions);
+            let accounts = account::process_all(transactions, verbose);
             if verbose {
-                println!("{:#?}", accounts);
+                println!("Client accounts processed: {}", accounts.len());
             }
 
-            csv_handler::write_accounts(accounts);
+            let write_res = csv_handler::write_accounts(accounts, &mut io::stdout());
+            if let Err(e) = write_res {
+                eprintln!("Error while writing output: {:?}", e);
+            }
         }
         Err(e) => eprintln!("Error while loading transactions: {:?}", e),
     }
