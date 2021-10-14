@@ -1,10 +1,11 @@
 use crate::transaction::*;
 
+use itertools::Itertools;
+use rayon::prelude::*;
 use rust_decimal::{Decimal, RoundingStrategy};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::ops::Neg;
-use itertools::Itertools;
 
 #[derive(Debug, PartialEq)]
 pub struct TransactionStatus {
@@ -173,7 +174,7 @@ pub fn process_all(transactions: Vec<Transaction>, verbose: bool) -> HashMap<Cli
         .map(|(id, items)| (id, items.collect()))
         .collect();
 
-    transactions_per_client.iter()
+    transactions_per_client.par_iter()
         .map(|(cid, ctr)| {
             let acc = process_client(cid, ctr, verbose);
             (cid.to_owned(), acc)
