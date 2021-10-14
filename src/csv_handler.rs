@@ -1,9 +1,9 @@
-use csv::*;
-use std::io;
-
 use crate::account::{Account, AccountOutput};
 use crate::transaction::{ClientId, Transaction};
+
+use csv::*;
 use std::collections::HashMap;
+use std::io;
 
 pub fn read_transactions(input: &mut dyn io::Read, verbose: bool) -> Result<Vec<Transaction>> {
     let mut reader = ReaderBuilder::new().trim(Trim::All).from_reader(input);
@@ -27,8 +27,6 @@ pub fn write_accounts(
     let acc_list: Vec<&Account> = accounts.values().collect();
     let out_list: Vec<AccountOutput> = acc_list.iter().map(|a| (*a).into()).collect();
 
-    // TODO output max 4 decimals
-
     let mut writer = csv::Writer::from_writer(output);
     for out in out_list {
         writer.serialize(out)?;
@@ -44,7 +42,7 @@ mod tests {
     use rust_decimal::Decimal;
 
     #[test]
-    fn test_read() {
+    fn test_read_deposit() {
         let input = "type, client, tx, amount\ndeposit, 1, 5, 98765.4321";
         let res = read_transactions(&mut input.as_bytes(), false);
         assert!(res.is_ok(), "csv parsing error: {:?}", res);
@@ -60,4 +58,23 @@ mod tests {
             assert_eq!(transactions, expected)
         }
     }
+
+    #[test]
+    fn test_read_dispute() {
+        let input = "type, client, tx, amount\ndispute, 1, 5,";
+        let res = read_transactions(&mut input.as_bytes(), false);
+        assert!(res.is_ok(), "csv parsing error: {:?}", res);
+
+        if let Ok(transactions) = res {
+            let expected = vec![Transaction {
+                transaction_type: TransactionType::Dispute,
+                client_id: 1,
+                transaction_id: 5,
+                amount: None,
+            }];
+
+            assert_eq!(transactions, expected)
+        }
+    }
+
 }

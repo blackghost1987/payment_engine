@@ -75,6 +75,20 @@ impl Account {
         }
     }
 
+    pub fn from_transactions(client_id: &ClientId, transactions: &[Transaction], verbose: bool) -> Account {
+        let mut acc = Account::new(client_id.to_owned());
+
+        for tr in transactions {
+            if let Err(e) = acc.process(tr, verbose) {
+                if verbose {
+                    println!("Ignoring transaction with ID: {}. Reason: {:?}", tr.transaction_id, e)
+                }
+            }
+        }
+
+        acc
+    }
+
     pub fn total(&self) -> Decimal {
         self.available + self.held
     }
@@ -151,21 +165,6 @@ impl Account {
     }
 }
 
-fn process_client(client_id: &ClientId, transactions: &Vec<Transaction>, verbose: bool) -> Account {
-    let mut acc = Account::new(client_id.to_owned());
-
-    for tr in transactions {
-        // process transaction
-        if let Err(e) = acc.process(tr, verbose) {
-            if verbose {
-                println!("Ignoring transaction with ID: {}. Reason: {:?}", tr.transaction_id, e)
-            }
-        }
-    }
-
-    acc
-}
-
 pub fn process_all(transactions: Vec<Transaction>, verbose: bool) -> HashMap<ClientId, Account> {
     let transactions_per_client: Vec<(ClientId, Vec<Transaction>)> = transactions
         .into_iter()
@@ -174,9 +173,10 @@ pub fn process_all(transactions: Vec<Transaction>, verbose: bool) -> HashMap<Cli
         .map(|(id, items)| (id, items.collect()))
         .collect();
 
+    // using rayon to process clients in parallel
     transactions_per_client.par_iter()
         .map(|(cid, ctr)| {
-            let acc = process_client(cid, ctr, verbose);
+            let acc = Account::from_transactions(cid, ctr, verbose);
             (cid.to_owned(), acc)
         })
         .collect()
@@ -233,11 +233,7 @@ mod tests {
             },
             false,
         );
-        assert_eq!(
-            res,
-            Err(Error::ClientIdMismatch),
-            "foreign transaction should fail"
-        );
+        assert_eq!(res, Err(Error::ClientIdMismatch), "foreign transaction should fail");
         assert_eq!(acc.total(), Decimal::ZERO);
         assert_eq!(acc.locked, false);
     }
@@ -285,11 +281,7 @@ mod tests {
             },
             false,
         );
-        assert_eq!(
-            res,
-            Err(Error::DuplicatedTransactionId),
-            "duplicated id should fail"
-        );
+        assert_eq!(res, Err(Error::DuplicatedTransactionId), "duplicated id should fail");
         assert_eq!(acc.total(), Decimal::new(123456, 2));
         assert_eq!(acc.locked, false);
     }
@@ -346,11 +338,7 @@ mod tests {
             },
             false,
         );
-        assert_eq!(
-            res,
-            Err(Error::InsufficientFunds),
-            "too large withdrawal should fail"
-        );
+        assert_eq!(res, Err(Error::InsufficientFunds), "too large withdrawal should fail");
         assert_eq!(acc.total(), Decimal::new(123456, 2));
         assert_eq!(acc.locked, false);
     }
@@ -417,11 +405,7 @@ mod tests {
             },
             false,
         );
-        assert_eq!(
-            res,
-            Err(Error::AlreadyDisputed),
-            "double dispute should fail"
-        );
+        assert_eq!(res, Err(Error::AlreadyDisputed), "double dispute should fail");
 
         assert_eq!(acc.held, Decimal::new(123456, 2));
         assert_eq!(acc.available, Decimal::ZERO);
@@ -636,11 +620,7 @@ mod tests {
             },
             false,
         );
-        assert_eq!(
-            res,
-            Err(Error::InsufficientFunds),
-            "too large withdrawal should fail"
-        );
+        assert_eq!(res, Err(Error::InsufficientFunds), "too large withdrawal should fail");
         assert_eq!(acc.available, Decimal::new(123456, 2));
         assert_eq!(acc.total(), Decimal::new(123456, 2));
         let res = acc.process(
@@ -652,11 +632,7 @@ mod tests {
             },
             false,
         );
-        assert_eq!(
-            res,
-            Err(Error::UnknownTransactionId),
-            "failed withdrawal should not be available for dispute"
-        );
+        assert_eq!(res, Err(Error::UnknownTransactionId), "failed withdrawal cannot be disputed");
 
         assert_eq!(acc.held, Decimal::ZERO);
         assert_eq!(acc.available, Decimal::new(123456, 2));
