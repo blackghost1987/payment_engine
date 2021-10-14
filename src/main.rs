@@ -5,6 +5,7 @@ mod transaction;
 use clap::{App, Arg, ArgMatches};
 use std::fs::File;
 use std::{io, process};
+use std::time::Instant;
 
 const APP_NAME: &str = "Payment Engine";
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -22,6 +23,12 @@ fn parse_args() -> ArgMatches<'static> {
                 .short("v")
                 .long("verbose")
                 .help("Print progress data"),
+        )
+        .arg(
+            Arg::with_name("timed")
+                .short("t")
+                .long("timed")
+                .help("Measure execution time"),
         )
         .get_matches()
 }
@@ -57,6 +64,9 @@ fn main() {
 
     let filename = opts.value_of("INPUT").expect("missing input arg"); // cannot fail here because it's a required arg
     let verbose = opts.is_present("verbose");
+    let timed = opts.is_present("timed");
+
+    let now = Instant::now();
 
     match File::open(filename) {
         Ok(file) => process_file(file, verbose),
@@ -64,5 +74,10 @@ fn main() {
             eprintln!("Opening of file failed! Error: {:?}", e);
             process::exit(2)
         }
+    }
+
+    let elapsed = now.elapsed();
+    if timed {
+        println!("Elapsed: {:.2?}", elapsed);
     }
 }
