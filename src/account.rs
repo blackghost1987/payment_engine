@@ -1,9 +1,10 @@
+use crate::transaction::*;
+
 use rust_decimal::{Decimal, RoundingStrategy};
 use serde::Serialize;
 use std::collections::HashMap;
-
-use crate::transaction::*;
 use std::ops::Neg;
+use itertools::Itertools;
 
 #[derive(Debug, PartialEq)]
 pub struct TransactionStatus {
@@ -149,24 +150,35 @@ impl Account {
     }
 }
 
-pub fn process_all(transactions: Vec<Transaction>, verbose: bool) -> HashMap<ClientId, Account> {
-    let mut accounts = HashMap::new();
-    for (i, tr) in transactions.iter().enumerate() {
-        // get or create if not yet exists
-        let acc = accounts
-            .entry(tr.client_id)
-            .or_insert_with(|| Account::new(tr.client_id));
+fn process_client(client_id: &ClientId, transactions: &Vec<Transaction>, verbose: bool) -> Account {
+    let mut acc = Account::new(client_id.to_owned());
+
+    for tr in transactions {
         // process transaction
         if let Err(e) = acc.process(tr, verbose) {
             if verbose {
-                println!(
-                    "Ignoring row #{} (transaction_id: {}). Reason: {:?}",
-                    i, tr.transaction_id, e
-                )
+                println!("Ignoring transaction with ID: {}. Reason: {:?}", tr.transaction_id, e)
             }
         }
     }
-    accounts
+
+    acc
+}
+
+pub fn process_all(transactions: Vec<Transaction>, verbose: bool) -> HashMap<ClientId, Account> {
+    let transactions_per_client: Vec<(ClientId, Vec<Transaction>)> = transactions
+        .into_iter()
+        .group_by(|t| t.client_id)
+        .into_iter()
+        .map(|(id, items)| (id, items.collect()))
+        .collect();
+
+    transactions_per_client.iter()
+        .map(|(cid, ctr)| {
+            let acc = process_client(cid, ctr, verbose);
+            (cid.to_owned(), acc)
+        })
+        .collect()
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
